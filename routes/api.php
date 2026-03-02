@@ -1,44 +1,31 @@
 <?php
 
-use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use App\Http\Controllers\Api\ChallengeController;
+use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\UserController;
-use Illuminate\Validation\ValidationException;
 
-Route::get('/test', UserController::class . '@userIndex')->middleware('auth:sanctum');
-
-Route::post('/login', function (Request $request) {
-    $request->validate([
-        'email' => 'required|email',
-        'password' => 'required|min:6',
-    ]);
-
-    $user = User::where('email', $request->email)->first();
-
-    if (!$user || !Hash::check($request->password, $user->password)) {
-        throw ValidationException::withMessages([
-            'email' => ["L'email ou le mot de passe est incorrect."],
-        ]);
-    }
-
-    return $user->createToken($request->email)->toJson();
+// -----------------------------------------------
+// Routes publiques
+// -----------------------------------------------
+Route::prefix('challenges')->group(function () {
+    Route::get('/stats', [ChallengeController::class, 'stats']);
+    Route::get('/', [ChallengeController::class, 'index']);
+    Route::get('/{challenge}', [ChallengeController::class, 'show']);
 });
 
-Route::post('/forgot-password', function (Request $request) {
-    $request->validate([
-        'email' => 'required|email',
-    ]); 
+// -----------------------------------------------
+// Routes protégées (auth:sanctum)
+// -----------------------------------------------
+Route::middleware('auth:sanctum')->group(function () {
 
-    $user = User::where('email', $request->email)->first();
+    // Profil utilisateur (points, niveau, badges)
+    Route::get('/profil', [ProfileController::class, 'index']);
 
-    if (!$user || !Hash::check($request->password, $user->password)) {
-        throw ValidationException::withMessages([
-            'email' => ["L'email ou le mot de passe est incorrect."],
-        ]);
-    }
-
-    // return $user->createToken($request->email)->toJson();
-    // TODO: send email
+    // Challenges
+    Route::prefix('challenges')->group(function () {
+        Route::get('/user/mes-challenges', [ChallengeController::class, 'mesChallenges']);
+        Route::post('/{challenge}/rejoindre', [ChallengeController::class, 'rejoindre']);
+        Route::post('/{challenge}/terminer', [ChallengeController::class, 'terminer']);
+        Route::delete('/{challenge}/quitter', [ChallengeController::class, 'quitter']);
+    });
 });
