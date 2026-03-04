@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\StatsController;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -7,38 +10,22 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use Illuminate\Validation\ValidationException;
 
-Route::get('/test', UserController::class . '@userIndex')->middleware('auth:sanctum');
+Route::get('/test', UserController::class . '@userIndex')
+    ->middleware('auth:sanctum');
 
-Route::post('/login', function (Request $request) {
-    $request->validate([
-        'email' => 'required|email',
-        'password' => 'required|min:6',
-    ]);
+Route::post('/login', [AuthController::class, 'login']);
 
-    $user = User::where('email', $request->email)->first();
+Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])
+    ->middleware('guest');
+    
+Route::get('/reset-password/{token}', [AuthController::class, 'getResetPassword'])
+    ->middleware('guest');
 
-    if (!$user || !Hash::check($request->password, $user->password)) {
-        throw ValidationException::withMessages([
-            'email' => ["L'email ou le mot de passe est incorrect."],
-        ]);
-    }
+Route::post('/reset-password', [AuthController::class, 'postResetPassword'])
+    ->middleware('guest');
 
-    return $user->createToken($request->email)->toJson();
-});
+Route::post('/contact', [ContactController::class, 'contact']);
 
-Route::post('/forgot-password', function (Request $request) {
-    $request->validate([
-        'email' => 'required|email',
-    ]); 
+Route::get('/stats', [StatsController::class, 'getStats']);
 
-    $user = User::where('email', $request->email)->first();
 
-    if (!$user || !Hash::check($request->password, $user->password)) {
-        throw ValidationException::withMessages([
-            'email' => ["L'email ou le mot de passe est incorrect."],
-        ]);
-    }
-
-    // return $user->createToken($request->email)->toJson();
-    // TODO: send email
-});
