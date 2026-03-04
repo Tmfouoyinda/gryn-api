@@ -12,7 +12,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'min:6'],
         ]);
 
@@ -27,8 +27,8 @@ class AuthController extends Controller
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
-            'status'        => 'success',
-            'user'          => $user,
+            'status' => 'success',
+            'user' => $user,
             'authorisation' => [
                 'token' => $token,
                 'type'  => 'bearer'
@@ -69,9 +69,9 @@ class AuthController extends Controller
     public function postResetPassword(Request $request)
     {
         $request->validate([
-            'token'                 => 'required|string',
-            'email'                 => 'required|email',
-            'password'              => 'required|min:8|confirmed',
+            'token' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|min:8|confirmed',
         ]);
 
         $status = Password::reset(
