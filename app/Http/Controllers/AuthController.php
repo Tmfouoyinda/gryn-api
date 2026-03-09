@@ -11,33 +11,6 @@ use Illuminate\Support\Facades\Password;
 
 class AuthController extends Controller
 {
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'min:6'],
-        ]);
-
-        if (!Auth::attempt($credentials)) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'unauthorized'
-            ], 401);
-        }
-
-        $user  = Auth::user();
-        $token = $user->createToken('auth-token')->plainTextToken;
-
-        return response()->json([
-            'status' => 'success',
-            'user' => $user,
-            'authorisation' => [
-                'token' => $token,
-                'type'  => 'bearer'
-            ]
-        ]);
-    }
-
     public function sendResetLink(Request $request)
     {
         $request->validate([

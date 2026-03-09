@@ -1,15 +1,12 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\StatsController;
-use App\Models\User;
-
+use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CalculationController;
 
 Route::get('/test', UserController::class . '@userIndex')
     ->middleware('auth:sanctum');
