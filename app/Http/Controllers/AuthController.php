@@ -37,7 +37,7 @@ class AuthController extends Controller
 
         return response()->json([
             'email' => $passwordReset->email,
-        ])
+        ]);
     }
 
 
