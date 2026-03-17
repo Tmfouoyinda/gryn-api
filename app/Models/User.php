@@ -2,114 +2,95 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens;
 
     protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'points',
-        'niveau',
+        'name', 'first_name', 'last_name',
+        'email', 'password',
+        'points', 'level',
     ];
 
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
+    protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'points'            => 'integer',
+            'level'             => 'integer',
         ];
     }
 
-    // -------------------------
-    // Relations
-    // -------------------------
+    // ─── Relations ─────────────────────────────────────────────────────────
+
+    public function calculations(): HasMany
+    {
+        return $this->hasMany(Calculation::class);
+    }
 
     public function challenges(): BelongsToMany
     {
         return $this->belongsToMany(Challenge::class, 'challenge_user')
-            ->withPivot(['statut', 'rejoint_le', 'termine_le'])
+            ->withPivot(['status', 'joined_at', 'completed_at', 'progress'])
             ->withTimestamps();
     }
 
     public function badges(): BelongsToMany
     {
         return $this->belongsToMany(Badge::class, 'badge_user')
-            ->withPivot('obtenu_le')
+            ->withPivot('earned_at')
             ->withTimestamps();
     }
 
-    // -------------------------
-    // Logique points & niveaux
-    // -------------------------
+    // ─── Méthodes métier ───────────────────────────────────────────────────
 
-    // Seuils de points pour chaque niveau
-    public static function seuilsNiveaux(): array
-    {
-        return [
-            1 => 0,
-            2 => 100,
-            3 => 300,
-            4 => 600,
-            5 => 1000,
-            6 => 1500,
-            7 => 2200,
-            8 => 3000,
-            9 => 4000,
-            10 => 5000,
-        ];
-    }
-
-    // Calcule le niveau selon les points
-    public static function calculerNiveau(int $points): int
-    {
-        $niveau = 1;
-        foreach (self::seuilsNiveaux() as $lvl => $seuil) {
-            if ($points >= $seuil) {
-                $niveau = $lvl;
-            }
-        }
-        return $niveau;
-    }
-
-    // Ajoute des points et met à jour le niveau
-    public function ajouterPoints(int $points): void
+    /**
+     * Ajoute des points et recalcule le niveau.
+     * Règle : level = floor(points / 500) + 1, plafonné à 10.
+     */
+    public function addPoints(int $points): void
     {
         $this->points += $points;
-        $this->niveau = self::calculerNiveau($this->points);
+        $this->level   = min(10, (int) floor($this->points / 500) + 1);
         $this->save();
     }
 
-    // Points nécessaires pour le prochain niveau
-    public function pointsProchainNiveau(): ?int
+    /**
+     * Attribue un badge si l'utilisateur ne le possède pas déjà.
+     * Retourne true si le badge a été accordé pour la première fois.
+     */
+    public function awardBadge(Badge $badge): bool
     {
-        $seuils = self::seuilsNiveaux();
-        $prochainNiveau = $this->niveau + 1;
-        return $seuils[$prochainNiveau] ?? null; // null = niveau max atteint
+        if ($this->badges()->where('badge_id', $badge->id)->exists()) {
+            return false;
+        }
+
+        $this->badges()->attach($badge->id, ['earned_at' => now()]);
+        $this->addPoints($badge->points_reward);
+
+        return true;
     }
 
-    // Progression en % vers le prochain niveau
-    public function progressionNiveau(): int
+    /**
+     * Envoie le lien de réinitialisation du mot de passe vers le frontend.
+     */
+    public function sendPasswordResetNotification($token): void
     {
-        $seuils = self::seuilsNiveaux();
-        $seuilActuel = $seuils[$this->niveau] ?? 0;
-        $seuilSuivant = $seuils[$this->niveau + 1] ?? null;
+        $url = config('app.frontend_url')
+            . '/reset-password?token=' . $token
+            . '&email=' . urlencode($this->email);
 
-        if (!$seuilSuivant) return 100; // niveau max
-
-        $progression = ($this->points - $seuilActuel) / ($seuilSuivant - $seuilActuel) * 100;
-        return (int) min(100, max(0, $progression));
+        $this->notify(new ResetPasswordNotification($url));
     }
 }
