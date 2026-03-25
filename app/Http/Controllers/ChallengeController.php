@@ -17,67 +17,116 @@ class ChallengeController extends Controller
     /**
      * Tous les challenges actifs avec le statut de participation de l'utilisateur.
      */
-    public function index(): AnonymousResourceCollection
+    public function index(): JsonResponse
     {
+        $userId = Auth::id();
+
         $challenges = Challenge::active()
             ->with('badge:id,name,icon')
             ->withCount('participants')
             ->get();
 
-        // Charger la participation de l'utilisateur connecté si authentifié
-        if ($userId = Auth::id()) {
-            $challenges->each(function (Challenge $challenge) use ($userId) {
-                $challenge->setRelation(
-                    'userParticipation',
-                    $challenge->participants()->where('user_id', $userId)->first()
-                );
-            });
+        $participations = collect();
+        if ($userId) {
+            $participations = Auth::user()
+                ->challenges()
+                ->get()
+                ->keyBy('id');
         }
 
-        return ChallengeResource::collection($challenges);
+        $data = $challenges->map(function (Challenge $challenge) use ($participations) {
+            $participation = $participations->get($challenge->id);
+
+            return [
+                'id'                 => $challenge->id,
+                'title'              => $challenge->title,
+                'description'        => $challenge->description,
+                'duration_days'      => $challenge->duration_days,
+                'difficulty'         => $challenge->difficulty,
+                'co2_reduction_kg'   => (float) $challenge->co2_reduction_kg,
+                'points_reward'      => $challenge->points_reward,
+                'participants_count' => $challenge->participants_count,
+                'badge'              => $challenge->badge ? [
+                    'id'   => $challenge->badge->id,
+                    'name' => $challenge->badge->name,
+                    'icon' => $challenge->badge->icon,
+                ] : null,
+                'my_participation'   => $participation ? [
+                    'status'       => $participation->pivot->status,
+                    'progress'     => $participation->pivot->progress,
+                    'joined_at'    => $participation->pivot->joined_at,
+                    'completed_at' => $participation->pivot->completed_at,
+                ] : null,
+            ];
+        });
+
+        return response()->json(['success' => true, 'data' => $data]);
     }
 
     /**
      * Challenges auxquels l'utilisateur connecté participe.
      */
-    public function myChallenges(): AnonymousResourceCollection
+    public function myChallenges(): JsonResponse
     {
         $challenges = Auth::user()
             ->challenges()
             ->with('badge:id,name,icon')
             ->withCount('participants')
             ->get();
-
-        return ChallengeResource::collection($challenges);
+    
+        $data = $challenges->map(function (Challenge $challenge) {
+            return [
+                'id'                 => $challenge->id,
+                'title'              => $challenge->title,
+                'description'        => $challenge->description,
+                'duration_days'      => $challenge->duration_days,
+                'difficulty'         => $challenge->difficulty,
+                'co2_reduction_kg'   => (float) $challenge->co2_reduction_kg,
+                'points_reward'      => $challenge->points_reward,
+                'participants_count' => $challenge->participants_count,
+                'badge'              => $challenge->badge ? [
+                    'id'   => $challenge->badge->id,
+                    'name' => $challenge->badge->name,
+                    'icon' => $challenge->badge->icon,
+                ] : null,
+                'my_participation' => [
+                    'status'       => $challenge->pivot->status,
+                    'progress'     => $challenge->pivot->progress,
+                    'joined_at'    => $challenge->pivot->joined_at,
+                    'completed_at' => $challenge->pivot->completed_at,
+                ],
+            ];
+        });
+    
+        return response()->json(['success' => true, 'data' => $data]);
     }
 
     /**
      * Rejoindre un challenge actif.
      */
-    public function join(int $id): JsonResponse
+    public function joinChallenge(int $id): JsonResponse
     {
         $challenge = Challenge::active()->findOrFail($id);
         $user      = Auth::user();
-
+    
         if ($user->challenges()->where('challenge_id', $id)->exists()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous participez déjà à ce challenge.',
             ], 409);
         }
-
+    
         $user->challenges()->attach($id, [
             'status'    => 'joined',
             'joined_at' => now(),
             'progress'  => 0,
         ]);
-
+    
         return response()->json([
             'success' => true,
             'message' => 'Vous avez rejoint le challenge avec succès.',
         ], 201);
     }
-
     /**
      * Mettre à jour la progression d'un challenge (0-100).
      */

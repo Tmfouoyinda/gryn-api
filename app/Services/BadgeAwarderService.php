@@ -22,7 +22,7 @@ class BadgeAwarderService
     {
         $user->loadCount([
             'calculations',
-            'challenges as completed_challenges_count' => fn ($q) => $q->wherePivot('status', 'completed'),
+            'challenges as completed_challenges_count' => fn ($q) => $q->where('challenge_user.status', 'completed'),
         ]);
 
         $newBadges = [];

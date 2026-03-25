@@ -26,10 +26,11 @@ class Challenge extends Model
         return $this->belongsTo(Badge::class);
     }
 
+   
     public function participants(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'challenge_user')
-            ->with(['challenge_user.status', 'joined_at', 'completed_at', 'progress'])
+            ->withPivot(['status', 'joined_at', 'completed_at', 'progress'])
             ->withTimestamps();
     }
 
